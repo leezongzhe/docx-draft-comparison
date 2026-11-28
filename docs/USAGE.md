@@ -2,7 +2,7 @@
 
 ## Install
 
-Install Python 3.11 or later and either Microsoft Word or LibreOffice. From the repository root, run:
+Install Python 3.11 or later (tested through Python 3.14) and either Microsoft Word 2013 or later, or LibreOffice. From the repository root, run:
 
 ```bat
 scripts\setup.bat
@@ -37,6 +37,7 @@ Use `--backend word` to require Microsoft Word or `--backend libreoffice` to req
 
 - If setup cannot find Python, install Python and ensure the `py` launcher is available.
 - If conversion fails, confirm that Word or LibreOffice can open both input files.
+- For Word 2013, open Word manually once and complete activation or first-run setup. The tool automatically tries both 64-bit and 32-bit Windows automation. If Windows still reports that the type library is not registered, repair the Office installation.
 - Floating objects and text embedded in images are preserved visually but may not receive word highlights.
 - Keep document and output files outside this repository; DOCX and PDF files are intentionally ignored.
 

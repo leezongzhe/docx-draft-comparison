@@ -1,3 +1,7 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
 from comparator import (
     Block,
     PageData,
@@ -5,6 +9,7 @@ from comparator import (
     _group_lines,
     _lines_to_blocks,
     _order_lines_for_reading,
+    _convert_with_word,
     build_marks,
     match_blocks,
     pair_pages,
@@ -251,4 +256,29 @@ def test_unordered_identical_phrases_are_not_red_and_green() -> None:
     assert not left_marks
     assert not right_marks
     assert stats.additions == stats.deletions == stats.replacements == 0
+
+
+def test_word_conversion_retries_with_another_powershell_architecture() -> None:
+    with TemporaryDirectory() as folder:
+        root = Path(folder)
+        source = root / "source.docx"
+        destination = root / "output.pdf"
+        helper = root / "word_to_pdf.ps1"
+        source.write_bytes(b"synthetic")
+        helper.write_text("synthetic", encoding="utf-8")
+        attempts: list[str] = []
+
+        def fake_run(command, *, cwd=None):
+            attempts.append(command[0])
+            if len(attempts) == 1:
+                from comparator import ComparisonError
+                raise ComparisonError("type library not registered")
+            destination.write_bytes(b"%PDF-synthetic")
+
+        with patch("comparator._powershell_candidates", return_value=["powershell-64", "powershell-32"]):
+            with patch("comparator._run", side_effect=fake_run):
+                _convert_with_word(source, destination, helper)
+
+        assert attempts == ["powershell-64", "powershell-32"]
+        assert destination.read_bytes().startswith(b"%PDF")
 

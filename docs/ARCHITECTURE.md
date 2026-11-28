@@ -19,6 +19,8 @@ The matcher keeps decimal values intact, handles multi-column reading order, and
 - `comparator.py`: conversion, extraction, alignment, highlighting, and PDF composition
 - `word_to_pdf.ps1`: isolated Microsoft Word automation helper
 
+For Word 2013 compatibility, the converter probes and retries both 64-bit and 32-bit PowerShell. This handles 32-bit Office installations on 64-bit Windows, where the Word COM type library may not be visible from the default PowerShell architecture.
+
 ## Data handling
 
 Input documents are opened read-only and processed locally. Temporary conversion files are removed after the comparison. The repository excludes documents and generated outputs by default.

@@ -20,12 +20,12 @@ try {
 }
 finally {
     if ($document -ne $null) {
-        $document.Close(0)
-        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($document) | Out-Null
+        try { $document.Close(0) } catch {}
+        try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($document) | Out-Null } catch {}
     }
     if ($word -ne $null) {
-        $word.Quit()
-        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null
+        try { $word.Quit() } catch {}
+        try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null } catch {}
     }
     [GC]::Collect()
     [GC]::WaitForPendingFinalizers()

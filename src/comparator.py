@@ -142,21 +142,61 @@ def _find_soffice() -> Path | None:
     return next((path for path in candidates if path.exists()), None)
 
 
-def _word_available() -> bool:
+def _powershell_candidates() -> list[str]:
+    """Return PowerShell executables for both Windows architectures.
+
+    Older Office releases are frequently installed as 32-bit applications on
+    64-bit Windows.  Their COM type library may only be visible to 32-bit
+    PowerShell, so trying only the default 64-bit executable can produce
+    TYPE_E_LIBNOTREGISTERED even though Word itself opens normally.
+    """
     if os.name != "nt":
-        return False
-    command = [
-        "powershell.exe",
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "$w=$null; try {$w=New-Object -ComObject Word.Application; exit 0} catch {exit 1} finally {if($w){$w.Quit()}}",
-    ]
-    try:
-        subprocess.run(command, check=True, capture_output=True, timeout=20, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        return True
-    except (subprocess.SubprocessError, OSError):
-        return False
+        return []
+    candidates: list[str] = []
+    found = shutil.which("powershell.exe")
+    if found:
+        candidates.append(found)
+    windows = Path(os.environ.get("WINDIR", r"C:\Windows"))
+    for path in (
+        windows / "SysWOW64/WindowsPowerShell/v1.0/powershell.exe",
+        windows / "System32/WindowsPowerShell/v1.0/powershell.exe",
+        windows / "Sysnative/WindowsPowerShell/v1.0/powershell.exe",
+    ):
+        if path.exists():
+            candidates.append(str(path))
+    if not candidates:
+        candidates.append("powershell.exe")
+    unique: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = os.path.normcase(os.path.normpath(candidate))
+        if key not in seen:
+            unique.append(candidate)
+            seen.add(key)
+    return unique
+
+
+def _word_available() -> bool:
+    probe = (
+        "$ErrorActionPreference='Stop'; $w=$null; "
+        "try {$w=New-Object -ComObject Word.Application; $w.Visible=$false; "
+        "$null=$w.Version; exit 0} catch {exit 1} "
+        "finally {if($w){try {$w.Quit()} catch {}}}"
+    )
+    for executable in _powershell_candidates():
+        command = [executable, "-NoProfile", "-NonInteractive", "-Command", probe]
+        try:
+            subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                timeout=25,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            return True
+        except (subprocess.SubprocessError, OSError):
+            continue
+    return False
 
 
 def choose_backend(requested: str) -> str:
@@ -179,19 +219,32 @@ def choose_backend(requested: str) -> str:
 
 
 def _convert_with_word(source: Path, destination: Path, helper: Path) -> None:
-    _run([
-        "powershell.exe",
-        "-NoProfile",
-        "-NonInteractive",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        str(helper),
-        str(source.resolve()),
-        str(destination.resolve()),
-    ])
-    if not destination.exists() or destination.stat().st_size == 0:
-        raise ComparisonError("Microsoft Word did not create the expected PDF.")
+    errors: list[str] = []
+    for executable in _powershell_candidates():
+        destination.unlink(missing_ok=True)
+        try:
+            _run([
+                executable,
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(helper),
+                str(source.resolve()),
+                str(destination.resolve()),
+            ])
+            if destination.exists() and destination.stat().st_size > 0:
+                return
+            errors.append(f"{executable}: no PDF was created")
+        except ComparisonError as exc:
+            errors.append(f"{executable}: {exc}")
+    detail = errors[-1] if errors else "no compatible PowerShell executable was found"
+    raise ComparisonError(
+        "Microsoft Word conversion failed using both 64-bit and 32-bit Windows automation. "
+        "For Word 2013, open Word once and complete its setup, then repair Office if needed. "
+        f"Last attempt: {detail}"
+    )
 
 
 def _convert_with_libreoffice(source: Path, destination: Path, workdir: Path) -> None:

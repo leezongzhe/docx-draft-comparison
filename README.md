@@ -17,8 +17,8 @@ The repository contains only the reusable tool, tests, and documentation. It doe
 ## Requirements
 
 - Windows 10 or later
-- Python 3.11 or later
-- Microsoft Word or LibreOffice for DOCX-to-PDF conversion
+- Python 3.11 or later (tested through Python 3.14)
+- Microsoft Word 2013 or later, or LibreOffice, for DOCX-to-PDF conversion
 
 ## Quick start
 
@@ -33,6 +33,8 @@ Command-line use:
 ```
 
 See [docs/USAGE.md](docs/USAGE.md) for options and troubleshooting. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for implementation details.
+
+Word 2013 compatibility includes automatic retries through both 64-bit and 32-bit Windows automation, which supports the common combination of 64-bit Windows with 32-bit Office 2013.
 
 ## Repository layout
 
